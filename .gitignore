@@ -1,0 +1,44 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+token.json
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+
+# Node / Remotion
+node_modules/
+remotion_project/node_modules/
+dist/
+build/
+
+# Generated runtime outputs
+output/
+logs/
+trace.txt
+test_out.txt
+
+# RL generated state
+rl_memory/experience.db
+rl_memory/policy.json
+rl_memory/learning_curve.jsonl
+rl_memory/policy.json.tmp
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
