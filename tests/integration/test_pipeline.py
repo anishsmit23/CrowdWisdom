@@ -100,19 +100,13 @@ def mock_all_services(mocker, tmp_path):
     mock_resp2.json.return_value = {"choices": [{"message": {"content": _make_mock_script()}}]}
     mock_post.side_effect = [mock_resp1, mock_resp2, mock_resp1, mock_resp2]
 
-    # 3. Google OAuth & GDrive
-    mock_oauth = MagicMock()
-    mock_oauth.Credentials.from_service_account_file.return_value = MagicMock()
-    mock_discovery = MagicMock()
-    mock_build = mock_discovery.build
-    mock_files = mock_build.return_value.files.return_value
-    mock_files.list.return_value.execute.return_value = {"files": [{"id": "1", "name": "doc"}]}
-    mock_files.export.return_value.execute.return_value = b"Mock GDrive Content"
-    
-    mocker.patch.dict("sys.modules", {
-        "google.oauth2.service_account": mock_oauth,
-        "googleapiclient.discovery": mock_discovery
-    })
+    # 3. CWT scraper (replace Google Drive usage)
+    mocker.patch(
+        "cwt_ads_agent.tools.cwt_scraper_tool.CWTScraperTool._run",
+        return_value=(
+            "CWT TEST CONTENT: pricing $49/month\n10000+ traders\n90% accuracy"
+        ),
+    )
 
     # 4. ElevenLabs
     mock_elevenlabs = MagicMock()

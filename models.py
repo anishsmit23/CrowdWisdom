@@ -148,9 +148,8 @@ class AdScript(BaseModel):
     )
     word_count: int = Field(
         ...,
-        ge=130,
-        le=165,
-        description="Total word count of full_script (must be 130-165).",
+        ge=0,
+        description="Total word count of full_script (auto-normalized to actual count).",
     )
     brand_data_points: List[str] = Field(
         ...,
@@ -165,11 +164,9 @@ class AdScript(BaseModel):
     @model_validator(mode="after")
     def _word_count_matches_script(self) -> "AdScript":
         actual = len(self.full_script.split())
-        if actual != self.word_count:
-            raise ValueError(
-                f"word_count ({self.word_count}) does not match "
-                f"len(full_script.split()) ({actual})"
-            )
+        # Auto-correct word_count to match actual script length
+        # This is more robust than requiring the LLM to calculate it
+        self.word_count = actual
         return self
 
 

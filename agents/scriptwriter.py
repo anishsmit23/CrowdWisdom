@@ -102,24 +102,47 @@ _BACKSTORY = dedent("""\
 """)
 
 _TASK_DESCRIPTION_TEMPLATE = dedent("""\
-    {rl_prefix}
-    CONTEXT - Winning Marketing Insights: {marketing_insights_json}
-    CWT PRODUCT DATA (from Google Drive): {drive_content}
+        {rl_prefix}
+        CONTEXT - Winning Marketing Insights: {marketing_insights_json}
+        CWT PRODUCT DATA (scraped from crowdwisdomtrading.com): {cwt_knowledge}
 
-    TASK: Write a 60-second video ad script for CrowdWisdomTrading.
+        TASK: Write a 60-second video ad script for CrowdWisdomTrading.
 
-    STRICT REQUIREMENTS:
-    - Exactly 5 sections: Hook (0-10s), Problem (10-25s), Solution (25-40s),
-      Proof (40-50s), CTA (50-60s)
-    - Each section has: section_name, start_s, end_s, narration, visual_description
-    - total word count between 130-165 words (count ONLY narration text)
-    - Include at least 2 specific CWT data points from the drive document
-      (exact stats, prices, or features - not generic claims)
-    - Apply the TONE DIRECTIVE above throughout ALL sections
-    - CTA section must use: {cta_level}
+        STRICT REQUIREMENTS:
+        - Exactly 5 sections: Hook (0-10s), Problem (10-25s), Solution (25-40s),
+            Proof (40-50s), CTA (50-60s)
+        - Each section MUST have these EXACT fields:
+            * section_name: string (one of: "Hook", "Problem", "Solution", "Proof", "CTA")
+            * start_s: float (start time in seconds: 0.0, 10.0, 25.0, 40.0, 50.0)
+            * end_s: float (end time in seconds: 10.0, 25.0, 40.0, 50.0, 60.0)
+            * narration: string (the voice-over text for this section)
+            * visual_description: string (what visuals/scenes to show during this section)
+        - Total narration word count between 130-165 words (count words across all narration fields ONLY)
+        - Include at least 2 SPECIFIC data points found in the CWT website content:
+            use real prices, real member counts, or real accuracy stats exactly as they appear.
+            Do NOT invent numbers.
+        - Apply the TONE DIRECTIVE above throughout ALL sections
+        - CTA section must use: {cta_level}
 
-    Output ONLY valid JSON conforming to AdScript Pydantic schema.
-    run_id: {run_id}\
+        OUTPUT FORMAT - Return ONLY valid JSON (no markdown, no explanations):
+        {{
+          "sections": [
+            {{
+              "section_name": "Hook",
+              "start_s": 0.0,
+              "end_s": 10.0,
+              "narration": "...",
+              "visual_description": "..."
+            }},
+            ... (4 more sections)
+          ],
+          "full_script": "concatenated narration of all sections",
+          "word_count": ###,
+          "brand_data_points": ["data point 1", "data point 2"],
+          "run_id": "{run_id}"
+        }}
+
+        run_id: {run_id}\
 """)
 
 _EXPECTED_OUTPUT = dedent("""\
@@ -174,7 +197,7 @@ def build_scriptwriter_agent() -> Agent:
 def build_scriptwriter_task(
     agent: Agent,
     marketing_insights_json: str,
-    drive_content: str,
+    cwt_knowledge: str,
     run_id: str,
     rl_params: Optional[Dict[str, Any]] = None,
 ) -> Task:
@@ -186,8 +209,8 @@ def build_scriptwriter_task(
         The ``Agent`` from ``build_scriptwriter_agent()``.
     marketing_insights_json:
         Serialised ``MarketingInsights`` JSON from the insights stage.
-    drive_content:
-        Plain-text CWT product data from ``GDriveTool``.
+    cwt_knowledge:
+        Plain-text CWT product data scraped from `crowdwisdomtrading.com`.
     run_id:
         Pipeline run identifier.
     rl_params:
@@ -207,7 +230,7 @@ def build_scriptwriter_task(
     description = _TASK_DESCRIPTION_TEMPLATE.format(
         rl_prefix=rl_prefix,
         marketing_insights_json=marketing_insights_json,
-        drive_content=drive_content,
+        cwt_knowledge=cwt_knowledge,
         cta_level=cta_level,
         run_id=run_id,
     )

@@ -212,4 +212,5 @@ Suggested migration path:
 - Phase 2: Log richer trajectories (prompt variants, generation diagnostics, viewer KPIs when available).
 - Phase 3: Introduce an offline simulator + reward model, then train PPO safely before online rollout.
 #   c w t   t r a d e  
+ #   c w t   t r a d e  
  

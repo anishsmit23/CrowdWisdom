@@ -66,9 +66,12 @@ class Config:
     elevenlabs_api_key: str = field(default_factory=lambda: _env("ELEVENLABS_API_KEY"))
 
     # --- Google Drive ---
-    gdrive_file_id: str = field(default_factory=lambda: _env("GDRIVE_FILE_ID"))
-    gdrive_credentials_path: str = field(
-        default_factory=lambda: _env("GDRIVE_CREDENTIALS_PATH", "credentials.json")
+    # --- CWT website scraper ---
+    cwt_website_url: str = field(
+        default_factory=lambda: _env("CWT_WEBSITE_URL", "https://www.crowdwisdomtrading.com")
+    )
+    cwt_cache_hours: int = field(
+        default_factory=lambda: int(_env("CWT_CACHE_HOURS", "24"))
     )
 
     # --- LLM ---

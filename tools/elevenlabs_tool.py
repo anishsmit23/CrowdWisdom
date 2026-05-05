@@ -34,6 +34,11 @@ VOICE_MAP: Dict[int, Dict[str, str]] = {
 
 _MAX_CHARS = 9_500  # stay within ElevenLabs 10K char/month free tier
 _EXPECTED_DURATION_RANGE = (55.0, 65.0)  # seconds
+_MODEL_CANDIDATES = (
+    "eleven_flash_v2_5",
+    "eleven_turbo_v2_5",
+    "eleven_multilingual_v2",
+)
 
 
 # ------------------------------------------------------------------ #
@@ -158,15 +163,30 @@ class ElevenLabsTTSTool(BaseTool):
 
         client = ElevenLabs(api_key=api_key)
 
-        audio_iter = client.text_to_speech.convert(
-            voice_id=voice["id"],
-            text=script_text,
-            model_id="eleven_monolingual_v1",
-            voice_settings=VoiceSettings(
-                stability=0.5,
-                similarity_boost=0.8,
-            ),
-        )
+        audio_iter = None
+        last_exc = None
+        for model_id in _MODEL_CANDIDATES:
+            try:
+                _log.info("Trying ElevenLabs model_id=%s", model_id)
+                audio_iter = client.text_to_speech.convert(
+                    voice_id=voice["id"],
+                    text=script_text,
+                    model_id=model_id,
+                    voice_settings=VoiceSettings(
+                        stability=0.5,
+                        similarity_boost=0.8,
+                    ),
+                )
+                break
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                _log.warning("ElevenLabs model %s failed: %s", model_id, exc)
+
+        if audio_iter is None:
+            raise AgentError(
+                f"All ElevenLabs model candidates failed: {last_exc}",
+                context={"tool": "ElevenLabs TTS", "models": list(_MODEL_CANDIDATES)},
+            )
 
         # The SDK returns an iterator of bytes chunks.
         with open(out_path, "wb") as f:

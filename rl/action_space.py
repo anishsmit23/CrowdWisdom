@@ -36,10 +36,8 @@ ACTION_SPACE: Dict[str, List[Any]] = {
         "stock market,investment tips",
     ],
     "llm_models": [
-        "mistralai/mistral-7b-instruct:free",
-        "meta-llama/llama-3-8b-instruct:free",
-        "google/gemma-2-9b-it:free",
-        "nousresearch/hermes-3-llama-3.1-405b:free",
+        # Keep RL on a single verified model to avoid 404 endpoint errors.
+        "openrouter/google/gemini-2.0-flash-001",
     ],
     "tone_styles": [
         "urgent and fear-based",

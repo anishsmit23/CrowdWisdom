@@ -4,12 +4,11 @@ pydantic>=2.0
 python-dotenv
 apify-client
 elevenlabs
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
 numpy>=1.24
 scipy>=1.10
 textstat>=0.7
 mutagen>=1.46
 pytest
 pytest-mock
+beautifulsoup4>=4.12
+lxml>=4.9

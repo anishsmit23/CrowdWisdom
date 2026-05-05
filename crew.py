@@ -127,12 +127,12 @@ def _get_video_agent():
         )
 
 
-def _build_tasks(run_id, research_agent, insights_agent, script_agent, video_agent):
+def _build_tasks(run_id, research_agent, insights_agent, script_agent, video_agent, cwt_knowledge: str):
     """Construct the ordered task list for the sequential crew."""
     from crewai import Task
 
     from cwt_ads_agent.tools.apify_tool import ApifyMetaAdsTool
-    from cwt_ads_agent.tools.gdrive_tool import GDriveTool
+    from cwt_ads_agent.tools.cwt_scraper_tool import CWTScraperTool
 
     # --- Task 1: Research ---
     research_task = Task(
@@ -164,39 +164,32 @@ def _build_tasks(run_id, research_agent, insights_agent, script_agent, video_age
 
     # --- Task 3: Scriptwriting ---
     from cwt_ads_agent.agents.scriptwriter import build_rl_prefix
+    from cwt_ads_agent.models import AdScript
+    
     rl_prefix = build_rl_prefix(config.rl_params) if config.rl_enabled else ""
 
-    gdrive_tool = GDriveTool()
+    cwt_tool = CWTScraperTool()
     script_task = Task(
         description=(
             f"{rl_prefix}"
             "Using the marketing insights from the previous task and CWT "
-            "product data from Google Drive, write a 60-second ad script "
+            "product data (scraped from crowdwisdomtrading.com), write a 60-second ad script "
             "with exactly 5 sections (130-165 words total narration). "
-            f"Return valid JSON conforming to AdScript schema. run_id: {run_id}"
+            f"CWT product content (excerpt): {cwt_knowledge[:1600]}\n\nReturn valid JSON conforming to AdScript schema. run_id: {run_id}"
         ),
         expected_output=(
             "A single JSON object with keys: sections (5), full_script, "
             "word_count (130-165), brand_data_points (>=2), run_id"
         ),
         agent=script_agent,
-        tools=[gdrive_tool],
+        tools=[cwt_tool],
         context=[insights_task],
+        output_json=AdScript,  # Enforce schema validation
     )
 
     # --- Task 4: Video Production ---
-    video_task = Task(
-        description=(
-            "Using the ad script from the previous task, generate scene "
-            "images via Pollinations, synthesise voice-over via ElevenLabs, "
-            "and render the final 60-second video via Remotion. "
-            "Save all outputs to the output/ directory. "
-            f"run_id: {run_id}"
-        ),
-        expected_output="File path to the rendered final_ad.mp4",
-        agent=video_agent,
-        context=[script_task],
-    )
+    from cwt_ads_agent.agents.videoproducer import build_video_task
+    video_task = build_video_task(video_agent, [script_task])
 
     return [research_task, insights_task, script_task, video_task]
 
@@ -396,16 +389,26 @@ def main() -> None:
     video_agent = _get_video_agent()
 
     # Build tasks
+    # Fetch CWT product knowledge from website (replaces Google Drive)
+    from cwt_ads_agent.tools.cwt_scraper_tool import CWTScraperTool
+    _log.info("Fetching CWT product knowledge from website...")
+    try:
+        cwt_knowledge = CWTScraperTool()._run()
+        _log.info("CWT knowledge ready: %d characters", len(cwt_knowledge))
+    except Exception as exc:
+        _log.warning("CWT scraper failed: %s — continuing with empty knowledge", exc)
+        cwt_knowledge = ""
+
     tasks = _build_tasks(
-        run_id, research_agent, insights_agent, script_agent, video_agent,
+        run_id, research_agent, insights_agent, script_agent, video_agent, cwt_knowledge,
     )
 
-    # Assemble crew
+    # Assemble crew (without video task - we'll do that directly after)
     from crewai import Crew, Process
 
     crew = Crew(
-        agents=[research_agent, insights_agent, script_agent, video_agent],
-        tasks=tasks,
+        agents=[research_agent, insights_agent, script_agent],
+        tasks=tasks[:3],  # Only research, insights, and script tasks
         process=Process.sequential,
         verbose=True,
     )
@@ -414,6 +417,22 @@ def main() -> None:
     try:
         result = crew.kickoff()
         _log.info("Pipeline completed successfully")
+        
+        # --- Direct video production (after script generation) ---
+        _log.info("Starting direct video production...")
+        try:
+            from cwt_ads_agent.tools.video_orchestrator_tool import VideoProductionOrchestratorTool
+            
+            _log.info("Script result type: %s", type(result))
+            
+            # Call the orchestrator directly with result (handles dict, string, markdown, etc.)
+            orchestrator = VideoProductionOrchestratorTool()
+            video_path = orchestrator._run(script_json=result)
+            _log.info("Video production completed: %s", video_path)
+            
+        except Exception as e:
+            _log.error("Direct video production failed: %s", e, exc_info=True)
+            
     except Exception as exc:
         _log.error("Pipeline failed: %s", exc, exc_info=True)
     finally:
@@ -426,12 +445,10 @@ def main() -> None:
                 )
                 _log.info("RL reward=%.4f | run_id=%s", reward, run_id)
             except Exception as exc:
-                _log.error("RL post-run hook failed: %s", exc, exc_info=True)
+                _log.error("RL post-run failed: %s", exc, exc_info=True)
 
-    elapsed = time.time() - start_time
+    elapsed = round(time.time() - start_time, 1)
     _log.info("Pipeline finished in %.1fs | run_id=%s", elapsed, run_id)
-
-    return result
 
 
 if __name__ == "__main__":

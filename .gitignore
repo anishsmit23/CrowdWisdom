@@ -30,6 +30,7 @@ output/
 logs/
 trace.txt
 test_out.txt
+output/cwt_knowledge.txt
 
 # RL generated state
 rl_memory/experience.db
@@ -42,3 +43,5 @@ rl_memory/policy.json.tmp
 Thumbs.db
 .vscode/
 .idea/
+
+status.txt 
